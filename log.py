@@ -78,7 +78,7 @@ def create_save_dir(furl):
         last_path_segment = domain  # 如果路径为空或只有根路径，使用主域名作为文件夹名称
 
     # 构造保存目录路径
-    save_dir = os.path.join('D:\\jpg', domain, last_path_segment)
+    save_dir = os.path.join(os.getcwd(),'pictures', domain, last_path_segment)
 
     # 创建目录
     os.makedirs(save_dir, exist_ok=True)
