@@ -3,6 +3,7 @@ import os
 import time
 import requests
 from PIL import Image
+from selenium.webdriver.common.by import By
 from urllib.parse import urlparse
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -12,11 +13,39 @@ from tkinter import messagebox
 import threading
 
 
+def is_log_in(driver):
+    """判断是否已经登录或需要登录"""
+    try:
+        element = driver.find_element(By.XPATH, '//a[contains(text(),"登录")]')
+        element.click()
+        time.sleep(5)
+        return True
+    except Exception as e:
+        print(f"登录检查失败：{e}")
+        return False
+
+
+def log_in(driver,username,password):
+    """模拟登录"""
+    try:
+        username_input = driver.find_element(By.XPATH,'//input[contains(@autocomplete,"username")]')
+        password_input = driver.find_element(By.XPATH,'//input[contains(@autocomplete,"password")]')
+        username_input.send_keys(username)
+        password_input.send_keys(password)
+        login_button = driver.find_element(By.XPATH,'//button[contains(text(),"登录")]')
+        driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
+        login_button.click()
+        input_window.destroy()
+        time.sleep(10)
+    except Exception as e:
+        print(f"登录页面元素定位失败：{e}")
+
+
 # 配置 Selenium 浏览器
 def configure_selenium():
     """配置并返回一个已初始化的无头浏览器实例"""
     chrome_options = Options()
-    chrome_options.add_argument('--headless')  # 无头模式
+    #chrome_options.add_argument('--headless')  # 无头模式
     capabilities = DesiredCapabilities.CHROME.copy()
     capabilities['goog:loggingPrefs'] = {'performance': 'ALL'}
     chrome_options.set_capability("goog:loggingPrefs", capabilities['goog:loggingPrefs'])
@@ -52,11 +81,20 @@ def download_image(url, filename):
 
 
 # 获取浏览器的性能日志
-def get_performance_logs(driver, url):
+def get_performance_logs(driver, furl):
     """获取浏览器的性能日志"""
-    driver.get(url)
-    time.sleep(5)  # 等待页面加载
-    return driver.get_log('performance')
+    driver.get(furl)
+    print("等待页面加载")
+    time.sleep(15)  # 等待页面加载
+    print("开始检查是否需要登录")
+    if is_log_in(driver):
+        print("需要登录")
+        root.after(0, lambda: yes_or_no_log_in_window(driver))
+        root.wait_window(new_window)
+        #log_in(driver,username,password)
+    else:
+        print("开始获取性能日志")
+        return driver.get_log('performance')
 
 
 def create_save_dir(furl):
@@ -66,9 +104,9 @@ def create_save_dir(furl):
     # 提取主域名部分
     domain_parts = parsed_url.netloc.split('.')
     if len(domain_parts) > 2:
-        domain = domain_parts[-2]  # 处理多级域名，如 www.example.com
+        domain = domain_parts[-2]  # 处理多级域名
     else:
-        domain = parsed_url.netloc  # 处理二级域名，如 madosoft.net
+        domain = parsed_url.netloc  # 处理二级域名
 
     # 获取路径中的最后一个目录部分
     path_segments = parsed_url.path.strip('/').split('/')
@@ -156,9 +194,38 @@ def run_crawl(furl):
         main(furl)  # 执行爬虫
         messagebox.showinfo("爬取完成", "爬取已完成，文件已下载。")
     except Exception as e:
+
         messagebox.showerror("错误", f"爬取过程中出现错误: {str(e)}")
     finally:
         start_button.config(state=tk.NORMAL)  # 任务完成后重新启用按钮
+
+
+def yes_or_no_log_in_window(driver):
+    """打开新窗口"""
+    global new_window
+    new_window = tk.Toplevel(root)
+    new_window.geometry("300x300")
+    new_window.title("登录")
+    tk.Label(new_window, text="检查可能需要登录才能使用该功能，是否登录？").pack()
+    tk.Button(new_window, text="是", command=lambda:input_username_password(driver)).pack(pady=10)
+    tk.Button(new_window, text="否", command=lambda: run_crawl(furl)).pack(pady=10)
+      # 关闭当前询问窗口
+
+def input_username_password(driver):
+    """输入用户名密码"""
+    global input_window
+    new_window.destroy()
+    input_window = tk.Toplevel(root)  # 用户输入窗口
+    input_window.geometry("300x150")
+    input_window.title("登录")
+
+
+    username = tk.Entry(input_window, width=20)
+    username.pack(pady=10)
+    password = tk.Entry(input_window, width=20, show='*')
+    password.pack(pady=10)
+    tk.Button(input_window, text="登录", command=lambda: log_in(driver, username.get(), password.get())).pack(pady=10)
+
 
 
 # 创建GUI窗口
